@@ -32,6 +32,14 @@ float get_temperature(void) {
     return temperature;
 }
 
+void capture_temp(void *pvParameter) {
+    float *tempPtr = (float *)pvParameter;
+    while (1) {
+        *tempPtr = get_temperature();  // Mettre à jour le taux de gaz
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
+    }
+}
+
 /*
 float get_temperature(void) {
     float voltage = 0;
@@ -48,4 +56,6 @@ float get_temperature(void) {
     float temperature = moy / 10.0; // 10 mV par degré
     return temperature;
 }
+
+
 */

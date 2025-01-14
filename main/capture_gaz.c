@@ -24,3 +24,12 @@ float Detecteur_gaz(void)
     // Retourner le taux de gaz
     return taux;
 }
+
+void capture_gaz(void *pvParameter) {
+    float *gazPtr = (float *)pvParameter;
+    while (1) {
+        *gazPtr = Detecteur_gaz();  // Mettre à jour le taux de gaz
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
+    }
+}
+

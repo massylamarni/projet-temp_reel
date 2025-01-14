@@ -1,6 +1,7 @@
 #include "capture_gaz.h"
 #include "capture_temp.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -22,8 +23,7 @@
 #define SERVER_URL "http://smarthomermse.alwaysdata.net"
 
 
-extern bool doorState;
-extern char uid_str[30];
+extern void capture_rfid(bool **ldoorStatePtr, char **luid_strPtr);
 
 static const char *TAG = "HTTP_POST" ;
 
@@ -143,12 +143,14 @@ ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info));
 
 
 // Fonction pour envoyer une requête HTTP POST
-void send_http_post(float temp , float gaz , float hum) {
+void send_http_post(float temp , float gaz, bool doorState, char *uid_str) {
 
     char json_data[128];
 
     // Crée la chaîne JSON formatée
-    snprintf(json_data, sizeof(json_data), "{\"temperature\":%.2f,\"gaz\":%.2f,\"mouvement\":%.2f}", temp, gaz, hum);
+    snprintf(json_data, sizeof(json_data), "{\"temperature\":%.2f,\"gaz\":%.2f,\"doorstate\":%d,\"uid\":%s}", temp, gaz, doorState, uid_str);
+    ESP_LOGI(TAG, "JSON: {\"temperature\":%.2f,\"gaz\":%.2f,\"doorstate\":%d,\"uid\":%s}", temp, gaz, doorState, uid_str);
+
 
     
      // HTTP client configuration with username and password
@@ -183,22 +185,19 @@ void send_http_post(float temp , float gaz , float hum) {
 
 
 void app_main(void) {
-
+    float *tempPtr = NULL;
+    float *gazPtr = NULL;
+    bool *doorStatePtr = NULL;
+    char *uid_strPtr = NULL;
 
     wifi_init_sta();
-
     xTaskCreate(tache_cliente, "tache_cliente", 4096, NULL, 5, NULL);
-
-    // Simuler des données et les envoyer via HTTP POST
-    float temperature = get_temperature();
-    float gaz = Detecteur_gaz();
-    float mouvement = 0 ;
+    xTaskCreate(capture_temp, "capture_temp", 2048, &tempPtr, 1, NULL);
+    xTaskCreate(capture_gaz, "capture_gaz", 2048, &gazPtr, 1, NULL);
+    capture_rfid(&doorStatePtr, &uid_strPtr);
 
     while (1) {
-        send_http_post(temperature, gaz , mouvement);
+        send_http_post(*tempPtr, *gazPtr , *doorStatePtr, uid_strPtr);
         vTaskDelay(10000 / portTICK_PERIOD_MS); // Attendre 10 secondes avant le prochain envoi
     }
-
-
-
 }

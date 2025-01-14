@@ -1,5 +1,6 @@
 #include <esp_log.h>
 #include <string.h>
+#include <stdbool.h>
 #include <time.h>
 #include <rc522.h>
 #include "driver/rc522_spi.h"
@@ -59,7 +60,11 @@ static void on_picc_state_changed(void *arg, esp_event_base_t base, int32_t even
     }
 }
 
-static void capture_rfid() {
+void capture_rfid(bool **ldoorStatePtr, char **luid_strPtr) {
+    //DEBUG
+    doorState = true;
+    sprintf(uid_str, "5d2f24sd");
+
     rc522_spi_create(&driver_config, &driver);
     rc522_driver_install(driver);
 
@@ -71,4 +76,6 @@ static void capture_rfid() {
     rc522_register_events(scanner, RC522_EVENT_PICC_STATE_CHANGED,on_picc_state_changed, NULL);
     rc522_start(scanner);
     ESP_LOGI(TAG, "RC522 scanner started. Waiting for cards..."); 
+    *ldoorStatePtr = &doorState;
+    *luid_strPtr = uid_str;
 }

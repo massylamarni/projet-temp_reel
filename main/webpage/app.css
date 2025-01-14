@@ -1,0 +1,76 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f4f9;
+    color: #333;
+    text-align: center;
+}
+
+header {
+    background: #0078d7;
+    color: white;
+    padding: 20px 0;
+}
+
+header h1 {
+    margin: 0;
+}
+
+main {
+    padding: 20px;
+}
+
+.gauge-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+.gauge {
+    width: 150px;
+    height: 150px;
+    border: 10px solid #eee;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, #f0f0f0 50%, transparent 100%);
+    position: relative;
+}
+
+.gauge .gauge-value {
+    font-size: 2em;
+    font-weight: bold;
+}
+
+.gauge .gauge-label {
+    position: absolute;
+    bottom: 15px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+.gauge .gauge-unit {
+    font-size: 1em;
+    color: #777;
+}
+
+#doorContainer {
+    margin-top: 20px;
+}
+
+#doorContainer img {
+    width: 120px;
+    height: 120px;
+    margin-top: 10px;
+}
+
+footer {
+    background: #0078d7;
+    color: white;
+    padding: 10px 0;
+    margin-top: 20px;
+}

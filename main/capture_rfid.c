@@ -6,6 +6,8 @@
 #include "driver/rc522_spi.h"
 #include "picc/rc522_mifare.h"
 #include "driver/gpio.h"
+#include "esp_random.h"
+
 static const char *TAG = "rc522-read-uid";//tag of rc522
 //gpio_pulldown_en(2);
 //part rfid code /////////////////////////
@@ -18,6 +20,9 @@ static const char *TAG = "rc522-read-uid";//tag of rc522
 
 bool doorState;
 char uid_str[RC522_PICC_UID_STR_BUFFER_SIZE_MAX];
+
+extern void send_http_post(char *route, char *sensor_data);
+
 
 // UID prédéfini pour la comparaison (exemple : "12345678")
 #define EXPECTED_UID "A2 B8 E8 A9" //ajouter l'un des uid pour simuler l'overture de la parte 
@@ -60,10 +65,7 @@ static void on_picc_state_changed(void *arg, esp_event_base_t base, int32_t even
     }
 }
 
-void capture_rfid(bool **ldoorStatePtr, char **luid_strPtr) {
-    //DEBUG
-    doorState = true;
-    sprintf(uid_str, "5d2f24sd");
+void capture_rfid(void) {
 
     rc522_spi_create(&driver_config, &driver);
     rc522_driver_install(driver);
@@ -76,6 +78,29 @@ void capture_rfid(bool **ldoorStatePtr, char **luid_strPtr) {
     rc522_register_events(scanner, RC522_EVENT_PICC_STATE_CHANGED,on_picc_state_changed, NULL);
     rc522_start(scanner);
     ESP_LOGI(TAG, "RC522 scanner started. Waiting for cards..."); 
-    *ldoorStatePtr = &doorState;
-    *luid_strPtr = uid_str;
+    send_http_post("/api/post/rfid", uid_str);
+    if (!doorState) send_http_post("/api/post/rfid", "0");
+}
+
+void simulate_rfid(void *pvParameter) {
+    const char *hex_chars = "0123456789ABCDEF";
+
+    char uid[13];  // 12 characters for the UID + null terminator
+
+    while (1) {
+        // Generate a random UID (e.g., 12-digit hexadecimal UID)
+        for (size_t i = 0; i < sizeof(uid) - 1; i++) {
+            uid[i] = hex_chars[esp_random() % 16];  // Random hex character
+        }
+        uid[sizeof(uid) - 1] = '\0';  // Null-terminate the string
+
+        // Print the simulated UID (this would be sent to the door controller in a real system)
+        send_http_post("/api/post/rfid", uid);        
+
+        // Simulate random interval for the next RFID scan (between 5 and 15 seconds)
+        int delay_time = (esp_random() % 15001) + 5000;  // Random delay between 5s to 15s
+        vTaskDelay(pdMS_TO_TICKS(5000));    // Delay to close the door
+        send_http_post("/api/post/rfid", "0");
+        vTaskDelay(pdMS_TO_TICKS(delay_time));
+    }
 }

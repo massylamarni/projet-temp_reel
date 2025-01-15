@@ -9,5 +9,6 @@
 void init_cap_gaz(void);
 float Detecteur_gaz(void);
 void capture_gaz(void *pvParameter);
+void simulate_gaz(void *pvParameter);
 
 #endif

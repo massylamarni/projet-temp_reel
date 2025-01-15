@@ -18,14 +18,14 @@
 #include "esp_http_client.h"
 #include "lwip/ip4_addr.h"
 
+
 #define BIT_CONNECTED BIT0
 #define BIT_DISCONNECTED BIT1
-#define SERVER_URL "http://smarthomermse.alwaysdata.net"
 
+extern void capture_rfid(void);
+extern void simulate_rfid(void *pvParameters);
 
-extern void capture_rfid(bool **ldoorStatePtr, char **luid_strPtr);
-
-static const char *TAG = "HTTP_POST" ;
+static const char *TAG = "MAIN" ;
 
 
 ip_event_got_ip_t *id_reseau;
@@ -136,68 +136,16 @@ ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info));
     printf("Wi-Fi initialisé. Connexion à SSID : Test\n");
 }
 
-
-
-
-
-
-
-// Fonction pour envoyer une requête HTTP POST
-void send_http_post(float temp , float gaz, bool doorState, char *uid_str) {
-
-    char json_data[128];
-
-    // Crée la chaîne JSON formatée
-    snprintf(json_data, sizeof(json_data), "{\"temperature\":%.2f,\"gaz\":%.2f,\"doorstate\":%d,\"uid\":%s}", temp, gaz, doorState, uid_str);
-    ESP_LOGI(TAG, "JSON: {\"temperature\":%.2f,\"gaz\":%.2f,\"doorstate\":%d,\"uid\":%s}", temp, gaz, doorState, uid_str);
-
-
-    
-     // HTTP client configuration with username and password
-    esp_http_client_config_t config = {
-        .url = SERVER_URL, 
-        .username = "smarthomermse", // Replace with your username
-        .password = "smarthomermse", // Replace with your password
-        .timeout_ms = 10000, // Increase timeout to 10 seconds
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_post_field(client, json_data, strlen(json_data));
-
-    esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP POST envoyé, code réponse = %d", esp_http_client_get_status_code(client));
-    } else {
-        ESP_LOGE(TAG, "Erreur lors de l'envoi du POST : %s", esp_err_to_name(err));
-    }
-
-    esp_http_client_cleanup(client);
-    
-}
-
-
-
-
-
-
-
-
 void app_main(void) {
-    float *tempPtr = NULL;
-    float *gazPtr = NULL;
-    bool *doorStatePtr = NULL;
-    char *uid_strPtr = NULL;
 
     wifi_init_sta();
     xTaskCreate(tache_cliente, "tache_cliente", 4096, NULL, 5, NULL);
-    xTaskCreate(capture_temp, "capture_temp", 2048, &tempPtr, 1, NULL);
-    xTaskCreate(capture_gaz, "capture_gaz", 2048, &gazPtr, 1, NULL);
-    capture_rfid(&doorStatePtr, &uid_strPtr);
 
-    while (1) {
-        send_http_post(*tempPtr, *gazPtr , *doorStatePtr, uid_strPtr);
-        vTaskDelay(10000 / portTICK_PERIOD_MS); // Attendre 10 secondes avant le prochain envoi
-    }
+    xTaskCreate(simulate_temp, "simulate_temp", 4096, NULL, 1, NULL);
+    xTaskCreate(simulate_gaz, "simulate_gaz", 4096, NULL, 1, NULL);
+    //xTaskCreate(capture_temp, "capture_temp", 4096, NULL, 1, NULL);
+    //xTaskCreate(capture_gaz, "capture_gaz", 4096, NULL, 1, NULL);
+
+    xTaskCreate(simulate_rfid, "simulate_rfid", 4096, NULL, 1, NULL);
+    //capture_rfid(void);
 }

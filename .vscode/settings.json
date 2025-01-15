@@ -2,6 +2,7 @@
     "idf.portWin": "COM5",
     "idf.flashType": "UART",
     "files.associations": {
-        "capture_gaz.h": "c"
+        "capture_gaz.h": "c",
+        "idir_wifi.h": "c"
     }
 }

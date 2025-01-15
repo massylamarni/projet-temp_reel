@@ -7,6 +7,7 @@
 void temperature_sensor_init(void);
 float get_temperature(void);
 void capture_temp(void *pvParameter);
+void simulate_temp(void *pvParameter);
 
 #endif // TEMPERATURE_SENSOR_H
 //////////////////////

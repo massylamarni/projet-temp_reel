@@ -111,8 +111,8 @@ void wifi_init_sta() {
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = "soumaya",
-            .password = "87654321",
+            .ssid = "DJAWEB",
+            .password = "12345678",
             .threshold.authmode = WIFI_AUTH_WPA2_PSK,
         },
     };

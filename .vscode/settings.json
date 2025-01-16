@@ -3,6 +3,8 @@
     "idf.flashType": "UART",
     "files.associations": {
         "capture_gaz.h": "c",
-        "idir_wifi.h": "c"
+        "idir_wifi.h": "c",
+        "capture_mouv.h": "c",
+        "stdbool.h": "c"
     }
 }

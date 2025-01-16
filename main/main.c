@@ -1,5 +1,6 @@
 #include "capture_gaz.h"
 #include "capture_temp.h"
+#include "capture_mouv.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include "freertos/FreeRTOS.h"
@@ -141,11 +142,15 @@ void app_main(void) {
     wifi_init_sta();
     xTaskCreate(tache_cliente, "tache_cliente", 4096, NULL, 5, NULL);
 
-    xTaskCreate(simulate_temp, "simulate_temp", 4096, NULL, 1, NULL);
-    xTaskCreate(simulate_gaz, "simulate_gaz", 4096, NULL, 1, NULL);
-    //xTaskCreate(capture_temp, "capture_temp", 4096, NULL, 1, NULL);
-    //xTaskCreate(capture_gaz, "capture_gaz", 4096, NULL, 1, NULL);
-
-    xTaskCreate(simulate_rfid, "simulate_rfid", 4096, NULL, 1, NULL);
-    //capture_rfid(void);
+    if (1) {
+        xTaskCreate(simulate_temp, "simulate_temp", 4096, NULL, 1, NULL);
+        xTaskCreate(simulate_gaz, "simulate_gaz", 4096, NULL, 1, NULL);
+        xTaskCreate(simulate_mouvement, "simulate_mouvement", 4096, NULL, 1, NULL);
+        xTaskCreate(simulate_rfid, "simulate_rfid", 4096, NULL, 1, NULL);
+    } else {
+        xTaskCreate(capture_temp, "capture_temp", 4096, NULL, 1, NULL);
+        xTaskCreate(capture_gaz, "capture_gaz", 4096, NULL, 1, NULL);
+        xTaskCreate(capture_mouvement, "capture_mouvement", 4096, NULL, 1, NULL);
+        capture_rfid();
+    }
 }

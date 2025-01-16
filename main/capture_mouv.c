@@ -29,7 +29,7 @@ void capture_mouvement(void *pvParameter) {
     char sensor_data[16];
     while (1) {
         snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float) Detecteur_mouvement());
-        send_http_post("/api/post/mouvement", sensor_data);
+        send_http_post("/api/post/movement", sensor_data);
         vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
     }
 }
@@ -38,7 +38,7 @@ void simulate_mouvement(void *pvParameter) {
     char sensor_data[16];
     while (1) {
         snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float) ((esp_random() % 2)));
-        send_http_post("/api/post/mouvement", sensor_data);
+        send_http_post("/api/post/movement", sensor_data);
         vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
     }
 }

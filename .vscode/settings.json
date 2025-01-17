@@ -4,7 +4,11 @@
     "files.associations": {
         "capture_gaz.h": "c",
         "idir_wifi.h": "c",
-        "capture_mouv.h": "c",
-        "stdbool.h": "c"
+        "capture_mov.h": "c",
+        "stdbool.h": "c",
+        "wifi_app.h": "c",
+        "capture_temp.h": "c",
+        "capture_rfid.h": "c",
+        "sdkconfig.h": "c"
     }
 }

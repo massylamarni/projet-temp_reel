@@ -6,9 +6,12 @@
 #include "freertos/task.h"
 #include "driver/adc.h"
 #include "esp_log.h"
-void init_cap_gaz(void);
-float Detecteur_gaz(void);
-void capture_gaz(void *pvParameter);
-void simulate_gaz(void *pvParameter);
+#include "esp_random.h"
+
+#define ADC_CHANNEL ADC1_CHANNEL_6 // GPIO 34
+
+void gas_sensor_init(void);
+float get_gas(void);
+float simulate_gaz(void);
 
 #endif

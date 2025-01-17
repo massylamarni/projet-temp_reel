@@ -1,15 +1,4 @@
 #include "capture_temp.h"
-#include "esp_random.h"
-#include <stdio.h>
-#include "idir_wifi.h"
-#define NUM_SAMPLES 20  // Nombre de lectures pour la moyenne
-// Définir la broche ADC et les paramètres
-#define ADC_CHANNEL ADC1_CHANNEL_5 // Canal ADC utilisé (GPIO 33)
-#define ADC_WIDTH ADC_WIDTH_BIT_12    // Résolution ADC : 12 bits (valeurs de 0 à 4095)
-#define ADC_ATTEN ADC_ATTEN_DB_11     // Atténuation : plage jusqu'à 3,3 V
-
-extern void send_http_post(char *route, char *sensor_data);
-
 
 // Fonction pour initialiser le capteur
 void temperature_sensor_init(void) {
@@ -18,8 +7,9 @@ void temperature_sensor_init(void) {
     // Configurer le canal ADC avec l'atténuation
     adc1_config_channel_atten(ADC_CHANNEL, ADC_ATTEN);
 }
+
 // Fonction pour obtenir la température
-float get_temperature(void) {
+float get_temp(void) {
     float voltage;
     float  somme=0;//pour faire la maoiyenne 
     // Lire la valeur brute de l'ADC
@@ -36,22 +26,8 @@ float get_temperature(void) {
     return temperature;
 }
 
-void capture_temp(void *pvParameter) {
-    char sensor_data[16];
-    while (1) {
-        snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float) get_temperature());
-        send_http_post("/api/post/temperature", sensor_data);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
-    }
-}
-
-void simulate_temp(void *pvParameter) {
-    char sensor_data[16];
-    while (1) {
-        snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float) ((esp_random() % 30) + 10));
-        send_http_post("/api/post/temperature", sensor_data);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1000 milliseconds (1 second)
-    }
+float simulate_temp(void) {
+    return (float)(esp_random() % 30) + 10;
 }
 
 /*

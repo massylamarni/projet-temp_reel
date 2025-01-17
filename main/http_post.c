@@ -1,5 +1,3 @@
-#include "capture_gaz.h"
-#include "capture_temp.h"
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -20,15 +18,13 @@
 
 static const char *TAG = "HTTP_POST" ;
 // Fonction pour envoyer une requête HTTP POST
-void send_http_post(char *route, char *sensor_data) {
-    char json_data[128];
+void send_http_post(char *route, char *json_data) {
     char url[256];
 
     // Crée la chaîne JSON formatée
-    snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
     snprintf(url, sizeof(url), "https://node-base-86c5.onrender.com%s", route);
     
-    printf("%s {\"data\":%s}\n", url, sensor_data);
+    printf("%s {\"data\":%s}\n", url, json_data);
 
     esp_http_client_config_t config = {
         .url = url,

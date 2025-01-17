@@ -1,7 +1,5 @@
-#include "capture_gaz.h"
-#include "capture_temp.h"
-#include "capture_mouv.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -19,138 +17,111 @@
 #include "esp_http_client.h"
 #include "lwip/ip4_addr.h"
 
+#include "capture_gaz.h"
+#include "capture_temp.h"
+#include "capture_mov.h"
+#include "capture_rfid.h"
+#include "wifi_app.h"
 
-#define BIT_CONNECTED BIT0
-#define BIT_DISCONNECTED BIT1
+#define TESTING true
 
-extern void capture_rfid(void);
-extern void simulate_rfid(void *pvParameters);
+extern void send_http_post(char *route, char *sensor_data);
 
 static const char *TAG = "MAIN" ;
 
+void post_rfid_capture(void *arg, esp_event_base_t base, int32_t event_id, void *data) {
+    if (data == NULL) {
+        void (*post_rfid_pointer)(void *arg, esp_event_base_t base, int32_t event_id, void *data) = post_rfid_capture;
+        capture_rfid(post_rfid_pointer);
+    } else {
+        rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
 
-ip_event_got_ip_t *id_reseau;
+        rc522_picc_state_changed_event_t *event = (rc522_picc_state_changed_event_t *)data;
+        rc522_picc_t *picc = event->picc;
 
- EventGroupHandle_t wifi_event_group;
-
-// Fonction à appeler lors de l'enregistrement des events wifi
-
-
-static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-    if (event_base == WIFI_EVENT) { //s'il recoit un event de type wifi:
-        if (event_id == WIFI_EVENT_STA_START) { //id de l'event=== type de l'event
-            esp_wifi_connect();
-        } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
-            printf("Wi-Fi déconnecté. Tentative de reconnexion...\n");
-            esp_wifi_connect();
-            xEventGroupClearBits(wifi_event_group, BIT_CONNECTED);
-            xEventGroupSetBits(wifi_event_group, BIT_DISCONNECTED);
+        if (picc->state != RC522_PICC_STATE_ACTIVE) {
+            return;
         }
-    } else if (event_base == IP_EVENT) {
-        if (event_id == IP_EVENT_STA_GOT_IP) {
-            printf("Wi-Fi connecté. appelons tache_cliente()...\n");
-            id_reseau=(ip_event_got_ip_t *)event_data;
-            xEventGroupSetBits(wifi_event_group, BIT_CONNECTED);
-            xEventGroupClearBits(wifi_event_group, BIT_DISCONNECTED);
+
+        rc522_picc_uid_to_str(&picc->uid, rfid_data->uid, sizeof(rfid_data->uid));
+
+        // Comparer l'UID détecté avec l'UID attendu
+        if (strcmp(rfid_data->uid, EXPECTED_UID) == 0) {
+            rfid_data->is_valid = true;
+        } else {
+            rfid_data->is_valid = false;
         }
-    }else if(event_id == WIFI_EVENT_STA_CONNECTED){
-        printf("Connecté\n");
-    }
-}
-
-// Tâche cliente réseau
-void tache_cliente(void *pvParameters) {
-    // Attendre que l'ESP32 soit connecté
-    xEventGroupWaitBits(wifi_event_group, BIT_CONNECTED, false, true, portMAX_DELAY);
-
-    printf("Tâche cliente démarrée (ESP32 connecté)\n");
-
-
-    printf("Adresse IP obtenue : " IPSTR, IP2STR(&id_reseau->ip_info.ip));
-    printf("\n");
-    printf("Masque de sous-réseau : " IPSTR, IP2STR(&id_reseau->ip_info.netmask));
-    printf("\n");
-    printf("Passerelle : " IPSTR, IP2STR(&id_reseau->ip_info.gw));
-    printf("\n");
-    int nom=0;
-    while (1) {
         
-        EventBits_t bits = xEventGroupGetBits(wifi_event_group);
-
-        if ((bits & BIT_CONNECTED)) {
-         printf("ESP32 toujours connecté. Exécution de la tâche cliente...\n");
-
-        } 
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        char json_data[128];    
+        snprintf(json_data, sizeof(json_data), "{\"data\":\"{\"uid\":%s, \"is_valid\":%s}}\"}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+        send_http_post("/api/post/rfid", json_data);
+    }
+}
+void post_rfid_simulation(void *pvParameter) {
+    rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
+    char json_data[128];
+    while (1) {
+        rfid_data = simulate_rfid();
+        snprintf(json_data, sizeof(json_data), "{\"data\":\"{\"uid\":%s, \"is_valid\":%s}}\"}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+        send_http_post("/api/post/rfid", json_data);
+        vTaskDelay(pdMS_TO_TICKS((esp_random() % 15001) + 5000));
     }
 }
 
-// Initialisation du Wi-Fi
-void wifi_init_sta() {
-    wifi_event_group = xEventGroupCreate();
-
-    // Initialiser NVS
-    //tcpip_adapter_init();
-    ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    
-
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    // Créer l'interface Wi-Fi
-    esp_netif_create_default_wifi_sta();
-
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    // Enregistrement des gestionnaires d'événements
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, NULL));
-
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = "DJAWEB",
-            .password = "12345678",
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
-        },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    
-    // Set Google DNS (8.8.8.8)
-esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-esp_netif_dns_info_t dns_info = {
-    .ip = {
-        .type = IPADDR_TYPE_V4,
-        .u_addr.ip4.addr = PP_HTONL(LWIP_MAKEU32(8, 8, 8, 8)) // Google DNS
+void post_temp_capture(void *pvParameter) {
+    char sensor_data[16];
+    char json_data[128];
+    while (1) {
+        snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_temp() : get_temp());
+        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        send_http_post("/api/post/temperature", json_data);
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
-};
-ESP_ERROR_CHECK(esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info));
+}
 
-    
+void post_gas_capture(void *pvParameter) {
+    char sensor_data[16];
+    char json_data[128];
+    while (1) {
+        snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_gaz() : get_gas());
+        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        send_http_post("/api/post/gas", json_data);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
 
-    printf("Wi-Fi initialisé. Connexion à SSID : Test\n");
+void post_movement_capture(void *pvParameter) {
+    char sensor_data[16];
+    char json_data[128];
+    while (1) {
+        snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float)(TESTING ? simulate_movement() : get_movement()));
+        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        send_http_post("/api/post/movement", json_data);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 
 void app_main(void) {
-
-    wifi_init_sta();
-    xTaskCreate(tache_cliente, "tache_cliente", 4096, NULL, 5, NULL);
-
-    if (1) {
-        xTaskCreate(simulate_temp, "simulate_temp", 4096, NULL, 1, NULL);
-        xTaskCreate(simulate_gaz, "simulate_gaz", 4096, NULL, 1, NULL);
-        xTaskCreate(simulate_mouvement, "simulate_mouvement", 4096, NULL, 1, NULL);
-        xTaskCreate(simulate_rfid, "simulate_rfid", 4096, NULL, 1, NULL);
-    } else {
-        xTaskCreate(capture_temp, "capture_temp", 4096, NULL, 1, NULL);
-        xTaskCreate(capture_gaz, "capture_gaz", 4096, NULL, 1, NULL);
-        xTaskCreate(capture_mouvement, "capture_mouvement", 4096, NULL, 1, NULL);
-        capture_rfid();
+    //Init NVS (Non Volatile Storage)
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
     }
+    ESP_ERROR_CHECK(ret);
+
+    wifi_app_start();
+    //TODO free rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
+    if (1) {
+        start_rfid();
+        temperature_sensor_init();
+        gas_sensor_init();
+        movement_sensor_init();
+        post_rfid_capture(NULL, NULL, 0, NULL);
+    } else {
+        xTaskCreate(post_rfid_simulation, "post_rfid_simulation", 4096, NULL, 1, NULL);
+    }
+    xTaskCreate(post_temp_capture, "post_temp_capture", 4096, NULL, 1, NULL);
+    xTaskCreate(post_gas_capture, "post_gas_capture", 4096, NULL, 1, NULL);
+    xTaskCreate(post_movement_capture, "post_movement_capture", 4096, NULL, 1, NULL);
 }

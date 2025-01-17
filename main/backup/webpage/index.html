@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratoire Hamdani</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+    <header>
+        <h1>Laboratoire Hamdani</h1>
+    </header>
+    <main>
+        <div class="gauge-container">
+            <div id="temperatureGauge" class="gauge">
+                <div class="gauge-label">Température</div>
+                <div class="gauge-value" id="temperature">--</div>
+                <div class="gauge-unit">°C</div>
+            </div>
+            <div id="humidityGauge" class="gauge">
+                <div class="gauge-label">Humidité</div>
+                <div class="gauge-value" id="humidity">--</div>
+                <div class="gauge-unit">%</div>
+            </div>
+            <div id="gasGauge" class="gauge">
+                <div class="gauge-label">Gaz</div>
+                <div class="gauge-value" id="gas">--</div>
+                <div class="gauge-unit">ppm</div>
+            </div>
+        </div>
+        <div id="doorContainer">
+            <h2>État de la Porte : <span id="doorStatus">Chargement...</span></h2>
+            <img id="doorImage" src="closed.png" alt="État de la porte">
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2025 Laboratoire Hamdani</p>
+    </footer>
+    <script src="app.js"></script>
+</body>
+</html>

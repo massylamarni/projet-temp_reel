@@ -28,17 +28,23 @@ static TaskHandle_t task_http_server_monitor = NULL;
 // Queue handle used to manipulate the main queue of events
 static QueueHandle_t http_server_monitor_queue_handle;
 
-// Embedded files: JQuery, index.html, app.css, app.js and favicon.ico files
+// Embedded files: JQuery, index.html, styles.css, scripts.js and favicon.ico files
 //extern const uint8_t jquery_3_3_1_min_js_start[]		asm("_binary_jquery_3_3_1_min_js_start");
 //extern const uint8_t jquery_3_3_1_min_js_end[]		asm("_binary_jquery_3_3_1_min_js_end");
 extern const uint8_t index_html_start[]				asm("_binary_index_html_start");
 extern const uint8_t index_html_end[]				asm("_binary_index_html_end");
-extern const uint8_t app_css_start[]				asm("_binary_app_css_start");
-extern const uint8_t app_css_end[]					asm("_binary_app_css_end");
-extern const uint8_t app_js_start[]					asm("_binary_app_js_start");
-extern const uint8_t app_js_end[]					asm("_binary_app_js_end");
+extern const uint8_t styles_css_start[]				asm("_binary_styles_css_start");
+extern const uint8_t styles_css_end[]				asm("_binary_styles_css_end");
+extern const uint8_t scripts_js_start[]				asm("_binary_scripts_js_start");
+extern const uint8_t scripts_js_end[]				asm("_binary_scripts_js_end");
 extern const uint8_t favicon_ico_start[]			asm("_binary_favicon_ico_start");
 extern const uint8_t favicon_ico_end[]				asm("_binary_favicon_ico_end");
+extern const uint8_t satoshi_medium_ttf_start[]			asm("_binary_satoshi_medium_ttf_start");
+extern const uint8_t satoshi_medium_ttf_end[]				asm("_binary_satoshi_medium_ttf_end");
+extern const uint8_t chart_js_start[]						asm("_binary_chart_js_start");
+extern const uint8_t chart_js_end[]						asm("_binary_chart_js_end");
+extern const uint8_t fns_date_adapter_js_start[]			asm("_binary_fns_date_adapter_js_start");
+extern const uint8_t fns_date_adapter_js_end[]			asm("_binary_fns_date_adapter_js_end");
 
 /**
  * HTTP server monitor task used to track events of the HTTP server
@@ -134,7 +140,7 @@ static esp_err_t http_server_get_temp_handler(httpd_req_t *req)
 
     char sensor_data[16];
     char json_data[128];
-    snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? get_temp() : simulate_temp());
+    snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_temp() : get_temp());
     snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
 
 	httpd_resp_set_type(req, "application/json");
@@ -154,7 +160,7 @@ static esp_err_t http_server_get_gas_handler(httpd_req_t *req)
 
     char sensor_data[16];
     char json_data[128];
-    snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? get_gas() : simulate_gaz());
+    snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_gaz() : get_gas());
     snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
 
 	httpd_resp_set_type(req, "application/json");
@@ -174,7 +180,7 @@ static esp_err_t http_server_get_movement_handler(httpd_req_t *req)
 
     char sensor_data[16];
     char json_data[128];
-    snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float)(TESTING ? get_movement() : simulate_movement()));
+    snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float)(TESTING ? simulate_movement() : get_movement()));
     snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
 
 	httpd_resp_set_type(req, "application/json");
@@ -194,7 +200,7 @@ static esp_err_t http_server_get_rfid_handler(httpd_req_t *req)
 	ESP_LOGI(TAG, "RFID data requested");
 
     char json_data[128];
-    snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", "0SD341SD53F4");
+    snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", "0SD341SD53F4", "0");
 
 	httpd_resp_set_type(req, "application/json");
 	httpd_resp_send(req, json_data, strlen(json_data));
@@ -203,31 +209,76 @@ static esp_err_t http_server_get_rfid_handler(httpd_req_t *req)
 }
 
 /**
- * app.css get handler is requested when accessing the web page.
+ * styles.css get handler is requested when accessing the web page.
  * @param req HTTP request for which the uri needs to be handled.
  * @return ESP_OK
  */
-static esp_err_t http_server_app_css_handler(httpd_req_t *req)
+static esp_err_t http_server_styles_css_handler(httpd_req_t *req)
 {
-	ESP_LOGI(TAG, "app.css requested");
+	ESP_LOGI(TAG, "styles.css requested");
 
 	httpd_resp_set_type(req, "text/css");
-	httpd_resp_send(req, (const char *)app_css_start, app_css_end - app_css_start);
+	httpd_resp_send(req, (const char *)styles_css_start, styles_css_end - styles_css_start);
 
 	return ESP_OK;
 }
 
 /**
- * app.js get handler is requested when accessing the web page.
+ * scripts.js get handler is requested when accessing the web page.
  * @param req HTTP request for which the uri needs to be handled.
  * @return ESP_OK
  */
-static esp_err_t http_server_app_js_handler(httpd_req_t *req)
+static esp_err_t http_server_scripts_js_handler(httpd_req_t *req)
 {
-	ESP_LOGI(TAG, "app.js requested");
+	ESP_LOGI(TAG, "scripts.js requested");
 
 	httpd_resp_set_type(req, "application/javascript");
-	httpd_resp_send(req, (const char *)app_js_start, app_js_end - app_js_start);
+	httpd_resp_send(req, (const char *)scripts_js_start, scripts_js_end - scripts_js_start);
+
+	return ESP_OK;
+}
+
+/**
+ * satoshi-medium.ttf get handler is requested when accessing the web page.
+ * @param req HTTP request for which the uri needs to be handled.
+ * @return ESP_OK
+ */
+static esp_err_t http_server_satoshi_medium_ttf_handler(httpd_req_t *req)
+{
+	ESP_LOGI(TAG, "satoshi-medium.ttf requested");
+
+	httpd_resp_set_type(req, "application/javascript");
+	httpd_resp_send(req, (const char *)satoshi_medium_ttf_start, satoshi_medium_ttf_end - satoshi_medium_ttf_start);
+
+	return ESP_OK;
+}
+
+/**
+ * chart.js get handler is requested when accessing the web page.
+ * @param req HTTP request for which the uri needs to be handled.
+ * @return ESP_OK
+ */
+static esp_err_t http_server_chart_js_handler(httpd_req_t *req)
+{
+	ESP_LOGI(TAG, "chart.js requested");
+
+	httpd_resp_set_type(req, "application/javascript");
+	httpd_resp_send(req, (const char *)chart_js_start, chart_js_end - chart_js_start);
+
+	return ESP_OK;
+}
+
+/**
+ * fns-date-adapter.js get handler is requested when accessing the web page.
+ * @param req HTTP request for which the uri needs to be handled.
+ * @return ESP_OK
+ */
+static esp_err_t http_server_fns_date_adapter_js_handler(httpd_req_t *req)
+{
+	ESP_LOGI(TAG, "fns-date-adapter.js requested");
+
+	httpd_resp_set_type(req, "application/javascript");
+	httpd_resp_send(req, (const char *)fns_date_adapter_js_start, fns_date_adapter_js_end - fns_date_adapter_js_start);
 
 	return ESP_OK;
 }
@@ -340,21 +391,45 @@ static httpd_handle_t http_server_configure(void)
 		};
 		httpd_register_uri_handler(http_server_handle, &get_rfid);
 
-		httpd_uri_t app_css = {
-				.uri = "/app.css",
+		httpd_uri_t styles_css = {
+				.uri = "/styles.css",
 				.method = HTTP_GET,
-				.handler = http_server_app_css_handler,
+				.handler = http_server_styles_css_handler,
 				.user_ctx = NULL
 		};
-		httpd_register_uri_handler(http_server_handle, &app_css);
+		httpd_register_uri_handler(http_server_handle, &styles_css);
 
-		httpd_uri_t app_js = {
-				.uri = "/app.js",
+		httpd_uri_t scripts_js = {
+				.uri = "/scripts.js",
 				.method = HTTP_GET,
-				.handler = http_server_app_js_handler,
+				.handler = http_server_scripts_js_handler,
 				.user_ctx = NULL
 		};
-		httpd_register_uri_handler(http_server_handle, &app_js);
+		httpd_register_uri_handler(http_server_handle, &scripts_js);
+
+		httpd_uri_t satoshi_medium_ttf = {
+				.uri = "/fonts/satoshi-medium.ttf",
+				.method = HTTP_GET,
+				.handler = http_server_satoshi_medium_ttf_handler,
+				.user_ctx = NULL
+		};
+		httpd_register_uri_handler(http_server_handle, &satoshi_medium_ttf);
+
+		httpd_uri_t chart_js = {
+				.uri = "/libs/chart.js",
+				.method = HTTP_GET,
+				.handler = http_server_chart_js_handler,
+				.user_ctx = NULL
+		};
+		httpd_register_uri_handler(http_server_handle, &chart_js);
+
+		httpd_uri_t fns_date_adapter_js = {
+				.uri = "/libs/fns-date-adapter.js",
+				.method = HTTP_GET,
+				.handler = http_server_fns_date_adapter_js_handler,
+				.user_ctx = NULL
+		};
+		httpd_register_uri_handler(http_server_handle, &fns_date_adapter_js);
 
 		httpd_uri_t favicon_ico = {
 				.uri = "/favicon.ico",

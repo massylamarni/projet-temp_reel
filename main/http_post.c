@@ -24,7 +24,7 @@ void send_http_post(char *route, char *json_data) {
     // Crée la chaîne JSON formatée
     snprintf(url, sizeof(url), "https://node-base-86c5.onrender.com%s", route);
     
-    printf("%s {\"data\":%s}\n", url, json_data);
+    printf("%s JSON: %s\n", url, json_data);
 
     esp_http_client_config_t config = {
         .url = url,

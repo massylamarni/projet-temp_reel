@@ -2,10 +2,9 @@
 
 static const char *TAG = "rc522-read-uid";//tag of rc522
 
-rfid_data_t *rfid_data;
-
 static void on_picc_state_changed(void *arg, esp_event_base_t base, int32_t event_id, void *data)
 {
+    rfid_data_t *rfid_data = malloc(sizeof(rfid_data_t));
     rc522_picc_state_changed_event_t *event = (rc522_picc_state_changed_event_t *)data;
     rc522_picc_t *picc = event->picc;
 
@@ -28,7 +27,6 @@ static void on_picc_state_changed(void *arg, esp_event_base_t base, int32_t even
 }
 
 void start_rfid(void) {
-    rfid_data = malloc(sizeof(rfid_data_t));
     rc522_spi_create(&driver_config, &driver);
     rc522_driver_install(driver);
 
@@ -47,6 +45,7 @@ void capture_rfid(void (*task_pointer)(void *arg, esp_event_base_t base, int32_t
 }
 
 rfid_data_t* simulate_rfid(void) {
+    rfid_data_t *rfid_data = malloc(sizeof(rfid_data_t));
     const char *hex_chars = "0123456789ABCDEF";
 
     char uid[13];  // 12 characters for the UID + null terminator

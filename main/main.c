@@ -53,7 +53,7 @@ void post_rfid_capture(void *arg, esp_event_base_t base, int32_t event_id, void 
         }
         
         char json_data[128];    
-        snprintf(json_data, sizeof(json_data), "{\"data\":\"{\"uid\":%s, \"is_valid\":%s}}\"}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+        snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
         send_http_post("/api/post/rfid", json_data);
     }
 }
@@ -62,7 +62,8 @@ void post_rfid_simulation(void *pvParameter) {
     char json_data[128];
     while (1) {
         rfid_data = simulate_rfid();
-        snprintf(json_data, sizeof(json_data), "{\"data\":\"{\"uid\":%s, \"is_valid\":%s}}\"}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+        snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+
         send_http_post("/api/post/rfid", json_data);
         vTaskDelay(pdMS_TO_TICKS((esp_random() % 15001) + 5000));
     }
@@ -73,7 +74,7 @@ void post_temp_capture(void *pvParameter) {
     char json_data[128];
     while (1) {
         snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_temp() : get_temp());
-        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
         send_http_post("/api/post/temperature", json_data);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -84,7 +85,7 @@ void post_gas_capture(void *pvParameter) {
     char json_data[128];
     while (1) {
         snprintf(sensor_data, sizeof(sensor_data), "%.2f", TESTING ? simulate_gaz() : get_gas());
-        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
         send_http_post("/api/post/gas", json_data);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -95,7 +96,7 @@ void post_movement_capture(void *pvParameter) {
     char json_data[128];
     while (1) {
         snprintf(sensor_data, sizeof(sensor_data), "%.2f", (float)(TESTING ? simulate_movement() : get_movement()));
-        snprintf(json_data, sizeof(json_data), "{\"data\":%s\"}", sensor_data);
+        snprintf(json_data, sizeof(json_data), "{\"data\":\"%s\"}", sensor_data);
         send_http_post("/api/post/movement", json_data);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -112,7 +113,7 @@ void app_main(void) {
 
     wifi_app_start();
     //TODO free rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
-    if (1) {
+    if (0) {
         start_rfid();
         temperature_sensor_init();
         gas_sensor_init();

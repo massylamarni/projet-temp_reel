@@ -8,6 +8,13 @@
 #ifndef MAIN_HTTP_SERVER_H_
 #define MAIN_HTTP_SERVER_H_
 
+#include "esp_http_server.h"
+#include "esp_log.h"
+#include "stdbool.h"
+#include <unistd.h>
+
+#include "http_post.h"
+
 // HTTP Server task
 #define HTTP_SERVER_TASK_STACK_SIZE			8192
 #define HTTP_SERVER_TASK_PRIORITY			4

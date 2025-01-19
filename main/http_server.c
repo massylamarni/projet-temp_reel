@@ -5,16 +5,19 @@
  *      Author: kjagu
  */
 
-#include "esp_http_server.h"
-#include "esp_log.h"
-
 #include "http_server.h"
-#include "capture_rfid.h"
-#include "capture_gaz.h"
-#include "capture_temp.h"
-#include "capture_mov.h"
 
 #define TESTING true
+#define MAX_CLIENTS_COUNT 10
+#define PING_TIMEOUT_MS 15000
+
+struct async_resp_arg {
+    httpd_handle_t hd;	// http server handle
+    int fd;				// socket file descriptor
+};
+struct async_resp_arg ws_clients[MAX_CLIENTS_COUNT];
+int ws_clients_count = 0;
+bool is_rfid_capture_enabled = 0;
 
 // Tag used for ESP serial console messages
 static const char TAG[] = "http_server";
@@ -97,6 +100,215 @@ static void http_server_monitor(void *parameter)
 	}
 }
 
+static void ws_send_rfid_data(void *arg, esp_event_base_t base, int32_t event_id, void *data) {
+	rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
+
+	rc522_picc_state_changed_event_t *event = (rc522_picc_state_changed_event_t *)data;
+	rc522_picc_t *picc = event->picc;
+
+	if (picc->state != RC522_PICC_STATE_ACTIVE) {
+		return;
+	}
+
+	rc522_picc_uid_to_str(&picc->uid, rfid_data->uid, sizeof(rfid_data->uid));
+
+	// Comparer l'UID détecté avec l'UID attendu
+	if (strcmp(rfid_data->uid, EXPECTED_UID) == 0) {
+		rfid_data->is_valid = true;
+	} else {
+		rfid_data->is_valid = false;
+	}
+	
+	char json_data[128];    
+	snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+
+	// Send data to all clients
+    for (int i = 0; i < ws_clients_count; i++) {
+        httpd_ws_frame_t ws_pkt;
+        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+        ws_pkt.payload = (uint8_t*)json_data;
+        ws_pkt.len = strlen(json_data);
+        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+        httpd_ws_send_frame_async(ws_clients[i].hd, ws_clients[i].fd, &ws_pkt);
+
+		//Remove disconnected clients from list
+		esp_err_t ret = httpd_ws_send_frame_async(ws_clients[i].hd, ws_clients[i].fd, &ws_pkt);
+        
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to send WebSocket data to client %d, removing client", i);
+
+			// Remove client and shift remaining clients
+			for (int j = i; j < ws_clients_count - 1; j++) {
+                ws_clients[j] = ws_clients[j + 1];
+            }
+            ws_clients_count--;
+
+			//Close connection with client
+			if (ws_clients[i].hd != NULL && ws_clients[i].fd >= 0) {
+				close(ws_clients[i].fd);
+				ESP_LOGI(TAG, "Closed WebSocket connection (fd: %d)", ws_clients[i].fd);
+			}
+            i--;  // Decrement i because the list size has changed after removal
+        }
+    }
+
+    free(rfid_data);
+}
+
+static void ws_simulate_send_rfid_data(void *pvParameter) {
+	rfid_data_t* rfid_data = malloc(sizeof(rfid_data_t));
+    char json_data[128];
+    while (1) {
+        rfid_data = get_random_rfid();
+        snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
+		ESP_LOGI(TAG, "SENDING %s", json_data);
+	// Send data to all clients
+    for (int i = 0; i < ws_clients_count; i++) {
+        httpd_ws_frame_t ws_pkt;
+        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+        ws_pkt.payload = (uint8_t*)json_data;
+        ws_pkt.len = strlen(json_data);
+        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+        httpd_ws_send_frame_async(ws_clients[i].hd, ws_clients[i].fd, &ws_pkt);
+
+		//Remove disconnected clients from list
+		esp_err_t ret = httpd_ws_send_frame_async(ws_clients[i].hd, ws_clients[i].fd, &ws_pkt);
+        
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to send WebSocket data to client %d, removing client", i);
+
+			// Remove client and shift remaining clients
+			for (int j = i; j < ws_clients_count - 1; j++) {
+                ws_clients[j] = ws_clients[j + 1];
+            }
+            ws_clients_count--;
+
+			//Close connection with client
+			if (ws_clients[i].hd != NULL && ws_clients[i].fd >= 0) {
+				close(ws_clients[i].fd);
+				ESP_LOGI(TAG, "Closed WebSocket connection (fd: %d)", ws_clients[i].fd);
+			}
+            i--;  // Decrement i because the list size has changed after removal
+        }
+    }
+
+    free(rfid_data);
+
+        vTaskDelay(pdMS_TO_TICKS(3000));
+    }
+}
+
+
+static void ws_async_send(void *arg) {
+    static const char * data = "Async data";
+    struct async_resp_arg *resp_arg = arg;
+    httpd_handle_t hd = resp_arg->hd;
+    int fd = resp_arg->fd;
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = (uint8_t*)data;
+    ws_pkt.len = strlen(data);
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    httpd_ws_send_frame_async(hd, fd, &ws_pkt);
+    free(resp_arg);
+}
+
+static esp_err_t trigger_async_send(httpd_handle_t handle, httpd_req_t *req)
+{
+    struct async_resp_arg *resp_arg = malloc(sizeof(struct async_resp_arg));
+    if (resp_arg == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    resp_arg->hd = req->handle;
+    resp_arg->fd = httpd_req_to_sockfd(req);
+    esp_err_t ret = httpd_queue_work(handle, ws_async_send, resp_arg);
+    if (ret != ESP_OK) {
+        free(resp_arg);
+    }
+    return ret;
+}
+
+/*
+ * This handler echos back the received ws data
+ * and triggers an async send if certain message received
+ */
+static esp_err_t ws_open_connection(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
+
+		// Check if the client already exists in the ws_clients array
+		for (int i = 0; i < ws_clients_count; i++) {
+			if (ws_clients[i].fd == httpd_req_to_sockfd(req)) {
+				ESP_LOGI(TAG, "Client already exists");
+				return ESP_OK;
+			}
+		}
+
+		if (ws_clients_count < MAX_CLIENTS_COUNT) {
+            ws_clients[ws_clients_count].hd = req->handle;
+            ws_clients[ws_clients_count].fd = httpd_req_to_sockfd(req);
+            ws_clients_count++;
+        } else {
+            ESP_LOGW(TAG, "Max clients reached, rejecting new connection");
+            return ESP_ERR_NO_MEM;
+        }
+
+        return ESP_OK;
+    }
+    httpd_ws_frame_t ws_pkt;
+    uint8_t *buf = NULL;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    /* Set max_len = 0 to get the frame len */
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "frame len is %d", ws_pkt.len);
+    if (ws_pkt.len) {
+        /* ws_pkt.len + 1 is for NULL termination as we are expecting a string */
+        buf = calloc(1, ws_pkt.len + 1);
+        if (buf == NULL) {
+            ESP_LOGE(TAG, "Failed to calloc memory for buf");
+            return ESP_ERR_NO_MEM;
+        }
+        ws_pkt.payload = buf;
+        /* Set max_len = ws_pkt.len to get the frame payload */
+        ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
+            free(buf);
+            return ret;
+        }
+        ESP_LOGI(TAG, "Got packet with message: %s", ws_pkt.payload);
+    }
+    ESP_LOGI(TAG, "Packet type: %d", ws_pkt.type);
+    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char*)ws_pkt.payload,"Trigger async") == 0) {
+        free(buf);
+        return trigger_async_send(req->handle, req);
+    }
+	else if (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char*)ws_pkt.payload, "ping") == 0) {
+        ws_pkt.type = HTTPD_WS_TYPE_PONG;
+        ret = httpd_ws_send_frame(req, &ws_pkt);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to send WebSocket pong frame");
+            return ret;
+        }
+    }
+
+    ret = httpd_ws_send_frame(req, &ws_pkt);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_send_frame failed with %d", ret);
+    }
+    free(buf);
+    return ret;
+}
+
 /**
  * Jquery get handler is requested when accessing the web page.
  * @param req HTTP request for which the uri needs to be handled.
@@ -119,8 +331,7 @@ static esp_err_t http_server_jquery_handler(httpd_req_t *req)
  * @param req HTTP request for which the uri needs to be handled.
  * @return ESP_OK
  */
-static esp_err_t http_server_index_html_handler(httpd_req_t *req)
-{
+static esp_err_t http_server_index_html_handler(httpd_req_t *req) {
 	ESP_LOGI(TAG, "index.html requested");
 
 	httpd_resp_set_type(req, "text/html");
@@ -198,12 +409,17 @@ static esp_err_t http_server_get_rfid_handler(httpd_req_t *req)
 {
 	//TODO make rfid send data using webSockets
 	ESP_LOGI(TAG, "RFID data requested");
-
-    char json_data[128];
-    snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", "0SD341SD53F4", "0");
-
-	httpd_resp_set_type(req, "application/json");
-	httpd_resp_send(req, json_data, strlen(json_data));
+	
+	if (is_rfid_capture_enabled) {
+    	if (TESTING) {
+			xTaskCreate(ws_simulate_send_rfid_data, "ws_simulate_send_rfid_data", 4096, NULL, 1, NULL);
+		} else {
+			start_rfid();
+			capture_rfid(ws_send_rfid_data);
+		}
+		is_rfid_capture_enabled = 1;
+	}
+    ws_open_connection(req);
 
 	return ESP_OK;
 }
@@ -298,8 +514,6 @@ static esp_err_t http_server_favicon_ico_handler(httpd_req_t *req)
 	return ESP_OK;
 }
 
-
-
 /**
  * Sets up the default httpd server configuration.
  * @return http server instance handle if successful, NULL otherwise.
@@ -384,10 +598,11 @@ static httpd_handle_t http_server_configure(void)
 		httpd_register_uri_handler(http_server_handle, &get_movement);
 
 		httpd_uri_t get_rfid = {
-				.uri = "/api/get/rfid",
+				.uri = "/api/ws/rfid",
 				.method = HTTP_GET,
 				.handler = http_server_get_rfid_handler,
-				.user_ctx = NULL
+				.user_ctx = NULL,
+				.is_websocket = true, 
 		};
 		httpd_register_uri_handler(http_server_handle, &get_rfid);
 

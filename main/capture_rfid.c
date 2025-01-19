@@ -40,11 +40,11 @@ void start_rfid(void) {
     ESP_LOGI(TAG, "RC522 scanner started. Waiting for cards..."); 
 }
 
-void capture_rfid(void (*task_pointer)(void *arg, esp_event_base_t base, int32_t event_id, void *data)) {
-    rc522_register_events(scanner, RC522_EVENT_PICC_STATE_CHANGED, task_pointer, NULL);
+void capture_rfid(void (*function_pointer)(void *arg, esp_event_base_t base, int32_t event_id, void *data)) {
+    rc522_register_events(scanner, RC522_EVENT_PICC_STATE_CHANGED, function_pointer, NULL);
 }
 
-rfid_data_t* simulate_rfid(void) {
+rfid_data_t* get_random_rfid(void) {
     rfid_data_t *rfid_data = malloc(sizeof(rfid_data_t));
     const char *hex_chars = "0123456789ABCDEF";
 

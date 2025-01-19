@@ -1,35 +1,61 @@
 const CHARTS_INFO = {
     'chart-1': {'endpointName': '/api/get/gas', 'chartType': 0},
-    'chart-2': {'endpointName': '/api/get/rfid', 'chartType': 0},
+    'chart-2': {'endpointName': '/api/get/movement', 'chartType': 0},
     'chart-3': {'endpointName': '/api/get/gas', 'chartType': 1},
 }
 const CHARTS_IDS = Object.keys(CHARTS_INFO);
-const ENDPOINTS = ['/api/get/gas', '/api/get/rfid'];
+const ENDPOINTS = ['/api/get/gas', '/api/get/movement'];
 
 /* Init Global variables */
 let chartInsts = [];
 let sensorData = [];
+let ws;
 
 document.addEventListener('DOMContentLoaded', function () {
     updateAll(true);
-    setInterval(updateAll, 1000);
+    setInterval(updateAll, 30000);
+
+    ws = new WebSocket('ws://192.168.0.1/api/ws/rfid');
+                
+    ws.onopen = function() {
+        console.log("WebSocket connection established.");
+    };
+
+    ws.onerror = function(error) {
+        console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = function() {
+        console.log("WebSocket connection closed.");
+    };
+
+    ws.onmessage = function(event) {
+        try {
+            console.log(event);
+        } catch (e) {
+            console.error("Error parsing received data:", e);
+        }
+    };    
 });
 
 const debugHere = (debug_tag, debug_data_collection) => {
     const DEBUG_SMALL_WALL = '----';
     const DEBUG_HALF_WALL = '--------------------------------------------------';
-    console.log(DEBUG_HALF_WALL + 'START ' + debug_tag + DEBUG_HALF_WALL);
-    debug_data_collection.forEach(debug_data => {
-        if (debug_data.type == 0) {
-            console.log(`${DEBUG_SMALL_WALL} ${debug_data.title} = ${debug_data.value} ${DEBUG_SMALL_WALL}`);
-        }
-        else if (debug_data.type == 1) {
-            console.log(DEBUG_SMALL_WALL + 'START ' + debug_data.title + DEBUG_SMALL_WALL);
-            console.log(debug_data.value);
-            console.log(DEBUG_SMALL_WALL + 'END ' + debug_data.title + DEBUG_SMALL_WALL);
-        }
-    });
-    console.log(DEBUG_HALF_WALL + 'END ' + debug_tag + DEBUG_HALF_WALL);
+    const ToggleDebug = false;
+    if (ToggleDebug) {
+        console.log(DEBUG_HALF_WALL + 'START ' + debug_tag + DEBUG_HALF_WALL);
+        debug_data_collection.forEach(debug_data => {
+            if (debug_data.type == 0) {
+                console.log(`${DEBUG_SMALL_WALL} ${debug_data.title} = ${debug_data.value} ${DEBUG_SMALL_WALL}`);
+            }
+            else if (debug_data.type == 1) {
+                console.log(DEBUG_SMALL_WALL + 'START ' + debug_data.title + DEBUG_SMALL_WALL);
+                console.log(debug_data.value);
+                console.log(DEBUG_SMALL_WALL + 'END ' + debug_data.title + DEBUG_SMALL_WALL);
+            }
+        });
+        console.log(DEBUG_HALF_WALL + 'END ' + debug_tag + DEBUG_HALF_WALL);
+    } 
 }
 
 const checkStruct = (data) => {

@@ -1,10 +1,11 @@
 const CHARTS_INFO = {
-    'chart-1': {'endpointName': '/api/get/gas', 'chartType': 0},
-    'chart-2': {'endpointName': '/api/get/movement', 'chartType': 0},
-    'chart-3': {'endpointName': '/api/get/gas', 'chartType': 1},
+    'chart-1': {'endpointName': '/api/get/gas', 'endpointType': 'GET', 'chartType': 0},
+    'chart-2': {'endpointName': '/api/ws/rfid', 'endpointType': 'WS', 'chartType': 0},
+    'chart-3': {'endpointName': '/api/get/gas', 'endpointType': 'GET', 'chartType': 1},
 }
 const CHARTS_IDS = Object.keys(CHARTS_INFO);
-const ENDPOINTS = ['/api/get/gas', '/api/get/movement'];
+const GET_ENDPOINTS = ['/api/get/gas', '/api/get/temperature', '/api/get/movement'];
+const WS_ENDPOINTS = ['/api/ws/rfid'];
 
 /* Init Global variables */
 let chartInsts = [];
@@ -13,7 +14,7 @@ let ws;
 
 document.addEventListener('DOMContentLoaded', function () {
     updateAll(true);
-    setInterval(updateAll, 30000);
+    setInterval(updateAll, 3000);
 
     ws = new WebSocket('ws://192.168.0.1/api/ws/rfid');
                 
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     ws.onmessage = function(event) {
         try {
-            console.log(event);
+            storeData('/api/ws/rfid', JSON.parse(event.data));
         } catch (e) {
             console.error("Error parsing received data:", e);
         }
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 const debugHere = (debug_tag, debug_data_collection) => {
     const DEBUG_SMALL_WALL = '----';
     const DEBUG_HALF_WALL = '--------------------------------------------------';
-    const ToggleDebug = false;
+    const ToggleDebug = true;
     if (ToggleDebug) {
         console.log(DEBUG_HALF_WALL + 'START ' + debug_tag + DEBUG_HALF_WALL);
         debug_data_collection.forEach(debug_data => {
@@ -192,40 +193,35 @@ function formatSensorData(sensorData, displayTimeRange) {
     return formattedData;
 }
 
-async function fetchDataAndStore(endpointName) {        //Dependency to sensorData
-    const debug_tag = 'fetchDataAndStore';
-
+function storeData(endpointName, data) {            //Dependency to sensorData
+    const debug_tag = 'storeData';
     const localStorageData = JSON.parse(localStorage.getItem(endpointName)) || [];
+
+    data = {...data, 'createdAt': new Date()};
+    localStorageData.push(data);
+    localStorage.setItem(endpointName, JSON.stringify(localStorageData));
+
+    sensorData[endpointName] = localStorageData;
+
+    const debug_data_collection = [
+        {
+            "title": `sensorData[${endpointName}]`,
+            "value": sensorData[endpointName],
+            "type": 1
+        }
+    ];
+    debugHere(debug_tag, debug_data_collection);
+}
+
+async function fetchData(endpointName) {
     try {
         const response = await fetch(endpointName);
         let data = await response.json();
 
         if (data) {
-            data = {...data, 'createdAt': new Date()};
-            localStorageData.push(data);
-            localStorage.setItem(endpointName, JSON.stringify(localStorageData));
+            storeData(endpointName, data);
         }
-        sensorData[endpointName] = localStorageData;
-        
-        const debug_data_collection = [
-            {
-                "title": `sensorData[${endpointName}]`,
-                "value": sensorData[endpointName],
-                "type": 1
-            }
-        ];
-        debugHere(debug_tag, debug_data_collection);
     } catch (error) {
-        sensorData[endpointName] = localStorageData;
-
-        const debug_data_collection = [
-            {
-                "title": `sensorData[${endpointName}]`,
-                "value": sensorData[endpointName],
-                "type": 1
-            }
-        ];
-        debugHere(debug_tag, debug_data_collection);
         console.error('Error fetching or storing data:', error);
     }
 }
@@ -480,11 +476,12 @@ function setChart(chartElId) {     //Dependecy to charData
     });
 }
 
-async function updateAll(isInit) {      //Dependecy to CHART_IDS and ChartInsts
+async function updateAll(isInit) {      //Dependecy to CHART_IDS, CHART_INFO and ChartInsts
     const debug_tag = 'updateAll';
 
-    for (let i = 0; i < ENDPOINTS.length; i++) {
-        await fetchDataAndStore(ENDPOINTS[i]);
+    for (let i = 0; i < CHARTS_IDS.length; i++) {
+        const chartInfo = CHARTS_INFO[CHARTS_IDS[i]];
+        if (chartInfo.endpointType == 'GET') await fetchData(chartInfo.endpointName);
     }
     updateSensorDisplayEls();
     if (isInit) {

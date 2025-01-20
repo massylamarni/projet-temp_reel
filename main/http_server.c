@@ -162,7 +162,7 @@ static void ws_simulate_send_rfid_data(void *pvParameter) {
     while (1) {
         rfid_data = get_random_rfid();
         snprintf(json_data, sizeof(json_data), "{\"data\":{\"uid\":\"%s\", \"is_valid\":\"%s\"}}", rfid_data->uid, rfid_data->is_valid ? "1" : "0");
-		ESP_LOGI(TAG, "SENDING %s", json_data);
+		ESP_LOGI(TAG, "Sending to ws clients %s", json_data);
 	// Send data to all clients
     for (int i = 0; i < ws_clients_count; i++) {
         httpd_ws_frame_t ws_pkt;
@@ -410,7 +410,7 @@ static esp_err_t http_server_get_rfid_handler(httpd_req_t *req)
 	//TODO make rfid send data using webSockets
 	ESP_LOGI(TAG, "RFID data requested");
 	
-	if (is_rfid_capture_enabled) {
+	if (!is_rfid_capture_enabled) {
     	if (TESTING) {
 			xTaskCreate(ws_simulate_send_rfid_data, "ws_simulate_send_rfid_data", 4096, NULL, 1, NULL);
 		} else {

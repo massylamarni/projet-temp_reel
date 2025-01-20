@@ -1,7 +1,7 @@
 
 ## Live Application
 
-[https://node-base-86c5.onrender.com/](https://node-base-86c5.onrender.com/)
+[https://node-base-five.vercel.app/](https://node-base-five.vercel.app/)
 
 ## Available API Endpoints
 
@@ -13,6 +13,6 @@
  
 ## Example Usage
 ```bash
-curl -X POST https://node-base-86c5.onrender.com/api/post/rfid \
+curl -X POST https://node-base-five.vercel.app/api/post/rfid \
   -H "Content-Type: application/json" \
   -d '{"data": "0"}'
